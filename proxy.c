@@ -51,16 +51,16 @@ int main(int argc,char **argv)
 void doit(int connfd)
 {
   /* the end server file descriptor */
-  int end_serverfd;
+  int serverfd;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-  char endserver_http_header [MAXLINE];
+  char server_http_header [MAXLINE];
   /* store the request line arguments */
   char hostname[MAXLINE], path[MAXLINE];
   int port;
-  /* rio is client's rio, server_rio is endserver's rio */
-  rio_t rio, server_rio;
-  Rio_readinitb(&rio, connfd);
-  Rio_readlineb(&rio, buf, MAXLINE);
+  /* rio_client is client's rio, rio_server is endserver's rio */
+  rio_t rio_client, rio_server;
+  Rio_readinitb(&rio_client, connfd);
+  Rio_readlineb(&rio_client, buf, MAXLINE);
   /* read the client request line */
   sscanf(buf,"%s %s %s", method, uri, version);
 
@@ -72,24 +72,23 @@ void doit(int connfd)
   /*parse the uri to GET hostname, file path, port*/
   parse_uri(uri, hostname, path, &port);
   /*build the http header which will send to the end server*/
-  make_http_header(endserver_http_header, hostname, path, port, &rio);
+  make_http_header(server_http_header, hostname, path, port, &rio_client);
   /*connect to the end server*/
-  end_serverfd = connect_endServer(hostname, port, endserver_http_header);
-  if(end_serverfd < 0) {
+  serverfd = connect_server(hostname, port, server_http_header);
+  if(serverfd < 0) {
     printf("connection failed\n");
     return;
   }
-  Rio_readinitb(&server_rio, end_serverfd);
+  Rio_readinitb(&rio_server, serverfd);
   /*write the http header to endserver*/
-  Rio_writen(end_serverfd, endserver_http_header, 
-          strlen(endserver_http_header));
+  Rio_writen(serverfd, server_http_header, strlen(server_http_header));
   /*receive message from end server and send to the client*/
   size_t n;
-  while((n = Rio_readlineb(&server_rio, buf, MAXLINE)) != 0) {
+  while((n = Rio_readlineb(&rio_server, buf, MAXLINE)) != 0) {
     printf("proxy received %d bytes, then sent to client\n",n);
     Rio_writen(connfd, buf, n);
   }
-  Close(end_serverfd);
+  Close(serverfd);
 }
 
 void make_http_header(char *http_header, char *hostname, char *path,
@@ -128,10 +127,10 @@ printf ("%s", http_header);
 }
 
 /*Connect to the end server*/
-inline int connect_endServer(char *hostname, int port, char *http_header) {
-  char portStr[100];
-  sprintf(portStr, "%d", port);
-  return Open_clientfd(hostname, portStr);
+inline int connect_server(char *hostname, int port, char *http_header) {
+  char portArr[100];
+  sprintf(portArr, "%d", port);
+  return Open_clientfd(hostname, portArr);
 }
 
 /*parse the uri to get hostname,file path ,port*/
