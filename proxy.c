@@ -1,4 +1,4 @@
-#include </tdio.h>
+#include <stdio.h>
 #include "csapp.h"
 
 #define MAX_OBJECT_SIZE 7204056
@@ -51,46 +51,45 @@ int main(int argc,char **argv)
 void doit(int connfd)
 {
   /* the end server file descriptor */
-  int serverfd;
+  int end_serverfd;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-  char server_http_header [MAXLINE];
+  char endserver_http_header [MAXLINE];
   /* store the request line arguments */
   char hostname[MAXLINE], path[MAXLINE];
   int port;
   /* rio is client's rio, server_rio is endserver's rio */
-  rio_t rio_client;
-  riot_t rio_server;
-  Rio_readinitb(&rio_client, connfd);
-  Rio_readlineb(&rio_client, buf, MAXLINE);
+  rio_t rio, server_rio;
+  Rio_readinitb(&rio, connfd);
+  Rio_readlineb(&rio, buf, MAXLINE);
   /* read the client request line */
   sscanf(buf,"%s %s %s", method, uri, version);
 
-  if(strcasecmp(method,"GET")){
+  /*if(strcasecmp(method,"GET")){
     clienterror(connfd, method, "501", "Proxy does not implement the method");
     return;
-  }
+  } */
 
   /*parse the uri to GET hostname, file path, port*/
   parse_uri(uri, hostname, path, &port);
   /*build the http header which will send to the end server*/
-  make_http_header(server_http_header, hostname, path, port, &rio_client);
+  make_http_header(endserver_http_header, hostname, path, port, &rio);
   /*connect to the end server*/
-  if (serverfd = connect_server(hostname, port, 
-      server_http_header) < 0) {
+  end_serverfd = connect_endServer(hostname, port, endserver_http_header);
+  if(end_serverfd < 0) {
     printf("connection failed\n");
     return;
   }
-  Rio_readinitb(&rio_client, serverfd);
+  Rio_readinitb(&server_rio, end_serverfd);
   /*write the http header to endserver*/
-  Rio_writen(serverfd, server_http_header, 
-          strlen(server_http_header));
+  Rio_writen(end_serverfd, endserver_http_header, 
+          strlen(endserver_http_header));
   /*receive message from end server and send to the client*/
   size_t n;
-  while((n = Rio_readlineb(&rio_server, buf, MAXLINE)) != 0) {
+  while((n = Rio_readlineb(&server_rio, buf, MAXLINE)) != 0) {
     printf("proxy received %d bytes, then sent to client\n",n);
     Rio_writen(connfd, buf, n);
   }
-  Close(serverfd);
+  Close(end_serverfd);
 }
 
 void make_http_header(char *http_header, char *hostname, char *path,
@@ -116,23 +115,23 @@ void make_http_header(char *http_header, char *hostname, char *path,
   }
   if(strlen(host_hdr) == 0)
     sprintf(host_hdr, host_hdr, hostname);
-    sprintf(http_header,"%s%s%s%s%s%s%s",
-      request_hdr,
-      host_hdr,
-      connection_hdr,
-      proxy_connection_hdr,
-      user_agent_hdr,
-      other_hdr,
-      endof_hdr);
-
+  sprintf(http_header,"%s%s%s%s%s%s%s",
+    request_hdr,
+    host_hdr,
+    connection_hdr,
+    proxy_connection_hdr,
+    user_agent_hdr,
+    other_hdr,
+    endof_hdr);
+printf ("%s", http_header);
   return ;
 }
 
 /*Connect to the end server*/
-inline int connect_server(char *hostname, int port, char *http_header) {
-  char portArr[100];
-  sprintf(portArr, "%d", port);
-  return Open_clientfd(hostname, postArr);
+inline int connect_endServer(char *hostname, int port, char *http_header) {
+  char portStr[100];
+  sprintf(portStr, "%d", port);
+  return Open_clientfd(hostname, portStr);
 }
 
 /*parse the uri to get hostname,file path ,port*/
@@ -145,13 +144,13 @@ void parse_uri(char *uri, char *hostname, char *path, int *port)
   position = position != NULL ? position + 2 : uri;
   if(position2 != NULL) {
     *position2 = '\0';
-    sscanf(position2, "%s", hostname);
+    sscanf(position, "%s", hostname);
     sscanf(position2 + 1, "%d%s", port, path);
   }
   else {
     position2 = strstr(position,"/");
     if(position2 != NULL) {
-      *position = '\0';
+      *position2 = '\0';
       sscanf(position, "%s", hostname);
       *position2 = '/';
       sscanf(position2, "%s", path);
@@ -162,4 +161,3 @@ void parse_uri(char *uri, char *hostname, char *path, int *port)
   }
   return;
 }
-
