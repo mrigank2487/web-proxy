@@ -19,7 +19,7 @@ void doit(int connfd);
 void parse_uri(char *uri,char *hostname,char *path,int *port);
 void make_http_header(char *http_header,char *hostname,char *path,int port,
     rio_t *client_rio);
-int connect_endServer(char *hostname,int port,char *http_header);
+int connect_server(char *hostname,int port,char *http_header);
 
 int main(int argc,char **argv)
 {
@@ -127,7 +127,7 @@ printf ("%s", http_header);
 }
 
 /*Connect to the end server*/
-inline int connect_server(char *hostname, int port, char *http_header) {
+int connect_server(char *hostname, int port, char *http_header) {
   char portArr[100];
   sprintf(portArr, "%d", port);
   return Open_clientfd(hostname, portArr);
