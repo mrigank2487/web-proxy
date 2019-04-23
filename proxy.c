@@ -64,10 +64,11 @@ void doit(int connfd)
   /* read the client request line */
   sscanf(buf,"%s %s %s", method, uri, version);
 
-  /*if(strcasecmp(method,"GET")){
-    clienterror(connfd, method, "501", "Proxy does not implement the method");
+  if(strcasecmp(method,"GET")){
+    clienterror(connfd, method, "501", "Not Implemented", 
+            "Proxy does not implement this method");
     return;
-  } */
+  }
 
   /*parse the uri to GET hostname, file path, port*/
   parse_uri(uri, hostname, path, &port);
@@ -160,3 +161,28 @@ void parse_uri(char *uri, char *hostname, char *path, int *port)
   }
   return;
 }
+
+/*
+ *  * clienterror - returns an error message to the client
+ *   */
+/* $begin clienterror */
+void clienterror(int fd, char *cause, char *errnum, 
+    char *shortmsg, char *longmsg) 
+{
+  char buf[MAXLINE], body[MAXBUF];
+
+  /* Build the HTTP response body */
+  sprintf(body, "<html><title>Tiny Error</title>");
+  sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
+  sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
+  sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
+  sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+
+  /* Print the HTTP response */
+  sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
+  sprintf(buf, "%sContent-type: text/html\r\n", buf);
+  sprintf(buf, "%sContent-length: %d\r\n\r\n", buf, (int)strlen(body));
+  rio_writen(fd, buf, strlen(buf));
+  rio_writen(fd, body, strlen(body));
+}
+/* $end clienterror */
