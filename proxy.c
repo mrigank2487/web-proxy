@@ -27,7 +27,7 @@ typedef struct {
   char response_hdr[MAXLINE];
 }cache_block;
 
-cache_block cache = malloc(sizseof(cache_block));
+cache_block *cache = (cache_block*)malloc(sizeof(cache_block));
 int main(int argc,char **argv)
 {
   int listenfd, connfd;
@@ -92,11 +92,11 @@ void doit(int connfd)
   Rio_writen(serverfd, server_http_header, strlen(server_http_header));
   /*receive message from end server and send to the client*/
   size_t n;
-  char* destination_buf = cache_block->cache_buf;
+  char *destination_buf = cache->cache_buf;
   while((n = Rio_readlineb(&rio_server, buf, MAXLINE)) != 0) {
     printf("proxy received %d bytes, then sent to client\n",n);
     Rio_writen(connfd, buf, n);
-    memcpy=(destination_buf,buf,n);
+    memcpy(destination_buf,buf,n);
     destination_buf+=n;
   }
   Close(serverfd);
