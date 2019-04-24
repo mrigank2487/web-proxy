@@ -21,6 +21,13 @@ void make_http_header(char *http_header,char *hostname,char *path,int port,
     rio_t *client_rio);
 int connect_server(char *hostname,int port,char *http_header);
 
+typedef struct {
+  char url[MAXLINE]; 
+  char cache_buf[MAX_OBJECT_SIZE];
+  char response_hdr[MAXLINE];
+}cache_block;
+
+cache_block cache = malloc(sizseof(cache_block));
 int main(int argc,char **argv)
 {
   int listenfd, connfd;
@@ -85,9 +92,12 @@ void doit(int connfd)
   Rio_writen(serverfd, server_http_header, strlen(server_http_header));
   /*receive message from end server and send to the client*/
   size_t n;
+  char* destination_buf = cache_block->cache_buf;
   while((n = Rio_readlineb(&rio_server, buf, MAXLINE)) != 0) {
     printf("proxy received %d bytes, then sent to client\n",n);
     Rio_writen(connfd, buf, n);
+    memcpy=(destination_buf,buf,n);
+    destination_buf+=n;
   }
   Close(serverfd);
 }
