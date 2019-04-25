@@ -33,11 +33,12 @@ cache_block *cache;
 
 int main(int argc,char **argv)
 {
-  cache = (cache_block*)malloc(sizeof(cache_block));
+  
   int listenfd, connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
+  cache = (cache_block*)malloc(sizeof(cache_block));
   /* Check Command-line args */
   if(argc != 2) {
     fprintf(stderr, "usage :%s <port> \n", argv[0]);
@@ -99,13 +100,20 @@ void doit(int connfd)
   size_t n;
   int size = 0;
   char *destination_buf = cache->cache_buf;
+  char *cache_url = cache->url;
+  /*while(Rio_readnb(&rio_server, buf, MAXLINE) != uri) {
+  	Rio_writen(connfd, server_http_header, strlen(server_http_header));
+  	Rio_writen(connfd, buf, n); 
+  }*/
   while((n = Rio_readnb(&rio_server, buf, MAXLINE)) != 0) {
-    Rio_writen(connfd, buf, n);
     if((size+=n) <= MAX_OBJECT_SIZE) {
     	memcpy(destination_buf, buf, n);
     	destination_buf=destination_buf + n;
     }
+    Rio_writen(connfd, buf, n);
   }
+  if((size+=n) <= MAX_OBJECT_SIZE)
+    	memcpy(cache_url, destination_buf, MAXLINE);
   Close(serverfd);
 }
 
@@ -179,6 +187,9 @@ void parse_uri(char *uri, char *hostname, char *path, int *port)
   return;
 }
 
+void init_cache() {
+
+}
 /*
  *  * clienterror - returns an error message to the client
  *   */
