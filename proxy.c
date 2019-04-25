@@ -15,21 +15,25 @@ static const char *user_agent_key= "User-Agent";
 static const char *proxy_connection_key = "Proxy-Connection";
 static const char *host_key = "Host";
 
-void doit(int connfd);
+void doit(int connfd );
 void parse_uri(char *uri,char *hostname,char *path,int *port);
 void make_http_header(char *http_header,char *hostname,char *path,int port,
     rio_t *client_rio);
 int connect_server(char *hostname,int port,char *http_header);
+void clienterror(int fd, char *cause, char *errnum, 
+    char *shortmsg, char *longmsg); 
 
 typedef struct {
   char url[MAXLINE]; 
   char cache_buf[MAX_OBJECT_SIZE];
   char response_hdr[MAXLINE];
-}cache_block;
+}cache_block;	
 
-cache_block *cache = (cache_block*)malloc(sizeof(cache_block));
+cache_block *cache;
+
 int main(int argc,char **argv)
 {
+  cache = (cache_block*)malloc(sizeof(cache_block));
   int listenfd, connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
@@ -41,6 +45,7 @@ int main(int argc,char **argv)
   }
   Signal(SIGPIPE, SIG_IGN);
   listenfd = Open_listenfd(argv[1]);
+
   while(1) {
     clientlen = sizeof(clientaddr);
     connfd = Accept(listenfd, (SA *) &clientaddr, &clientlen);
@@ -92,12 +97,14 @@ void doit(int connfd)
   Rio_writen(serverfd, server_http_header, strlen(server_http_header));
   /*receive message from end server and send to the client*/
   size_t n;
+  int size = 0;
   char *destination_buf = cache->cache_buf;
-  while((n = Rio_readlineb(&rio_server, buf, MAXLINE)) != 0) {
-    printf("proxy received %d bytes, then sent to client\n",n);
+  while((n = Rio_readnb(&rio_server, buf, MAXLINE)) != 0) {
     Rio_writen(connfd, buf, n);
-    memcpy(destination_buf,buf,n);
-    destination_buf+=n;
+    if((size+=n) <= MAX_OBJECT_SIZE) {
+    	memcpy(destination_buf, buf, n);
+    	destination_buf=destination_buf + n;
+    }
   }
   Close(serverfd);
 }
