@@ -20,25 +20,26 @@ void parse_uri(char *uri,char *hostname,char *path,int *port);
 void make_http_header(char *http_header,char *hostname,char *path,int port,
     rio_t *client_rio);
 int connect_server(char *hostname,int port,char *http_header);
+void init_cache();
 void clienterror(int fd, char *cause, char *errnum, 
     char *shortmsg, char *longmsg); 
 
 typedef struct {
   char url[MAXLINE]; 
-  char cache_buf[MAX_OBJECT_SIZE];
   char response_hdr[MAXLINE];
+  int cache_bytes;
 }cache_block;	
 
 cache_block *cache;
 
 int main(int argc,char **argv)
-{
-  
+{ 
   int listenfd, connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
-  cache = (cache_block*)malloc(sizeof(cache_block));
+
+  init_cache();
   /* Check Command-line args */
   if(argc != 2) {
     fprintf(stderr, "usage :%s <port> \n", argv[0]);
@@ -72,8 +73,12 @@ void doit(int connfd)
   int port;
   /* rio_client is client's rio, rio_server is endserver's rio */
   rio_t rio_client, rio_server;
-  Rio_readinitb(&rio_client, connfd);
-  Rio_readlineb(&rio_client, buf, MAXLINE);
+  rio_readinitb(&rio_client, connfd);
+  rio_readlineb(&rio_client, buf, MAXLINE);
+  
+  char *cache_buf = (cache_block*)malloc(sizeof(cache_block));
+  char *destination_buf = (cache_block*)malloc(sizeof(cache_block));
+
   /* read the client request line */
   sscanf(buf,"%s %s %s", method, uri, version);
 
@@ -88,33 +93,41 @@ void doit(int connfd)
   /*build the http header which will send to the end server*/
   make_http_header(server_http_header, hostname, path, port, &rio_client);
   /*connect to the end server*/
-  serverfd = connect_server(hostname, port, server_http_header);
-  if(serverfd < 0) {
-    printf("connection failed\n");
-    return;
+  if (strcmp(uri, cache->url) == 0) {
+  	rio_writen(connfd, cache->response_hdr, strlen(cache->response_hdr));
+  	rio_writen(connfd, buf, cache->cache_bytes);
   }
-  Rio_readinitb(&rio_server, serverfd);
-  /*write the http header to endserver*/
-  Rio_writen(serverfd, server_http_header, strlen(server_http_header));
-  /*receive message from end server and send to the client*/
-  size_t n;
-  int size = 0;
-  char *destination_buf = cache->cache_buf;
-  char *cache_url = cache->url;
-  /*while(Rio_readnb(&rio_server, buf, MAXLINE) != uri) {
-  	Rio_writen(connfd, server_http_header, strlen(server_http_header));
-  	Rio_writen(connfd, buf, n); 
-  }*/
-  while((n = Rio_readnb(&rio_server, buf, MAXLINE)) != 0) {
-    if((size+=n) <= MAX_OBJECT_SIZE) {
-    	memcpy(destination_buf, buf, n);
-    	destination_buf=destination_buf + n;
-    }
-    Rio_writen(connfd, buf, n);
+  else {
+  	serverfd = connect_server(hostname, port, server_http_header);
+  	if(serverfd < 0) {
+  		printf("connection failed\n");
+  		return;
+  	}
+  	rio_readinitb(&rio_server, serverfd);
+  	/*write the http header to endserver*/
+  	rio_writen(serverfd, server_http_header, strlen(server_http_header));
+  	/*receive message from end server and send to the client*/
+  	size_t n;
+  	int size = 0;
+  	
+  	while(strcmp(buf, "\r\n") == 0) {
+  		n = rio_readlineb(&rio_server, buf, MAXLINE);
+  		cache->cache_bytes = n;
+  		rio_writen(connfd, buf, n);
+  		strcat(cache->response_hdr, buf);
+  	}
+  	while((n = rio_readnb(&rio_server, buf, MAXLINE)) != 0) {
+    	if((size+=n) <= MAX_OBJECT_SIZE) {
+    		memcpy(destination_buf, buf, n);
+    		destination_buf=destination_buf + n;
+    	}
+    	rio_writen(connfd, buf, n);
+  	}
+  	cache_buf = destination_buf;
+  	strcpy(cache->url, uri);
+  	//memcpy(cache->response_hdr, server_http_header, n);
+  	Close(serverfd);
   }
-  if((size+=n) <= MAX_OBJECT_SIZE)
-    	memcpy(cache_url, destination_buf, MAXLINE);
-  Close(serverfd);
 }
 
 void make_http_header(char *http_header, char *hostname, char *path,
@@ -124,7 +137,7 @@ void make_http_header(char *http_header, char *hostname, char *path,
   /*request line*/
   sprintf(request_hdr, requestline_hdr, path);
   /*get other request header for client rio and change it */
-  while(Rio_readlineb(client_rio, buf, MAXLINE) > 0)
+  while(rio_readlineb(client_rio, buf, MAXLINE) > 0)
   {
     if(strcmp(buf, endof_hdr) == 0) 
       break;/*EOF*/
@@ -188,7 +201,8 @@ void parse_uri(char *uri, char *hostname, char *path, int *port)
 }
 
 void init_cache() {
-
+	strcpy(cache->url, "");
+	strcpy(cache->response_hdr, "");
 }
 /*
  *  * clienterror - returns an error message to the client
