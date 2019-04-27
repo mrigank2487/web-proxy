@@ -129,8 +129,9 @@ void doit(int connfd)
   		strcat(cache.response_hdr, buf);
   	}
   	while((n = rio_readnb(&rio_server, buf, MAXLINE)) > 0) {
-    	if((size+=n) <= MAX_OBJECT_SIZE) {
-    		memcpy(cache_buf + size - n, buf, n);
+    	if((size+n) <= MAX_OBJECT_SIZE) {
+    		memcpy(cache_buf + size, buf, n);
+    		size+=n;
     	}
     	if (rio_writen(connfd, buf, n) < 0)
     		printf("Error\n");
