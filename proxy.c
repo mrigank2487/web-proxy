@@ -91,12 +91,16 @@ void doit(int connfd)
             "Proxy does not implement this method");
     return;
   }
-
+  char uri_copy[MAXLINE];
+  strcpy(uri_copy, uri);
   /*parse the uri to GET hostname, file path, port*/
   parse_uri(uri, hostname, path, &port);
+  strcpy(uri, uri_copy);
   /*build the http header which will send to the end server*/
   make_http_header(server_http_header, hostname, path, port, &rio_client);
   /*connect to the end server*/
+  printf("cache url: %s\n", cache.url);
+  printf("uri: %s\n", uri);
   if (strcmp(uri, cache.url) == 0) {
   	if (rio_writen(connfd, cache.response_hdr, strlen(cache.response_hdr) < 0))
   		printf("Error\n");
@@ -125,18 +129,18 @@ void doit(int connfd)
   		strcat(cache.response_hdr, buf);
   	}
   	while((n = rio_readnb(&rio_server, buf, MAXLINE)) > 0) {
-  		cache.cache_bytes += n;
     	if((size+=n) <= MAX_OBJECT_SIZE) {
-    		memcpy(cache_buf + size, buf, n);
+    		memcpy(cache_buf + size - n, buf, n);
     	}
     	if (rio_writen(connfd, buf, n) < 0)
     		printf("Error\n");
   	}
-  	if (cache.cache_bytes <= MAX_OBJECT_SIZE) {
-  		cache.destination_buf = (cache_block*)malloc(cache.cache_bytes * sizeof(char));
-  		memcpy(cache.destination_buf, cache_buf, cache.cache_bytes);
+  	if (size <= MAX_OBJECT_SIZE) {
+  		cache.destination_buf = (char*)malloc(size);
+  		memcpy(cache.destination_buf, cache_buf, size);
   		strcpy(cache.url, uri);
   	}
+  	cache.cache_bytes = size;
   	//memcpy(cache->response_hdr, server_http_header, n);
   	Close(serverfd);
   }
