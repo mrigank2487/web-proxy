@@ -99,8 +99,6 @@ void doit(int connfd)
   /*build the http header which will send to the end server*/
   make_http_header(server_http_header, hostname, path, port, &rio_client);
   /*connect to the end server*/
-  printf("cache url: %s\n", cache.url);
-  printf("uri: %s\n", uri);
   if (strcmp(uri, cache.url) == 0) {
   	if (rio_writen(connfd, cache.response_hdr, strlen(cache.response_hdr) < 0))
   		printf("Error\n");
@@ -121,13 +119,14 @@ void doit(int connfd)
   	size_t n;
   	int size = 0;
   	
-  	while(strcmp(buf, "\r\n") == 0) {
+  	while(strcmp(buf, "\r\n") > 0) {
   		if((n = rio_readlineb(&rio_server, buf, MAXLINE)) < 0)
   			printf("Error\n");
   		if (rio_writen(connfd, buf, n) < 0)
   			printf("Error\n");
   		strcat(cache.response_hdr, buf);
   	}
+
   	while((n = rio_readnb(&rio_server, buf, MAXLINE)) > 0) {
     	if((size+n) <= MAX_OBJECT_SIZE) {
     		memcpy(cache_buf + size, buf, n);
@@ -142,7 +141,6 @@ void doit(int connfd)
   		strcpy(cache.url, uri);
   	}
   	cache.cache_bytes = size;
-  	//memcpy(cache->response_hdr, server_http_header, n);
   	Close(serverfd);
   }
 }
