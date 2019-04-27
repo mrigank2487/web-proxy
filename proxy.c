@@ -19,7 +19,6 @@ void parse_uri(char *uri,char *hostname,char *path,int *port);
 void make_http_header(char *http_header,char *hostname,char *path,int port,
     rio_t *client_rio);
 int connect_server(char *hostname,int port,char *http_header);
-void init_cache();
 void clienterror(int fd, char *cause, char *errnum, 
     char *shortmsg, char *longmsg); 
 
@@ -28,9 +27,9 @@ typedef struct cache_block{
   char response_hdr[MAXLINE];
   char *destination_buf;
   int cache_bytes;
-}cache_block;	
+}cache_block;
 
-cache_block *cache;
+cache_block cache;
 
 int main(int argc,char **argv)
 { 
@@ -39,9 +38,10 @@ int main(int argc,char **argv)
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
 
-  printf("HERE\n");
-  init_cache();
-  printf("HERE\n");
+  //printf("HERE\n");
+  strcpy(cache.url, "");
+  strcpy(cache.response_hdr, "");
+  //printf("HERE\n");
   
   /* Check Command-line args */
   if(argc != 2) {
@@ -97,10 +97,10 @@ void doit(int connfd)
   /*build the http header which will send to the end server*/
   make_http_header(server_http_header, hostname, path, port, &rio_client);
   /*connect to the end server*/
-  if (strcmp(uri, cache->url) == 0) {
-  	if (rio_writen(connfd, cache->response_hdr, strlen(cache->response_hdr) < 0))
+  if (strcmp(uri, cache.url) == 0) {
+  	if (rio_writen(connfd, cache.response_hdr, strlen(cache.response_hdr) < 0))
   		printf("Error\n");
-  	if (rio_writen(connfd, cache->destination_buf, cache->cache_bytes) < 0)
+  	if (rio_writen(connfd, cache.destination_buf, cache.cache_bytes) < 0)
   		printf("Error\n");
   }
   else {
@@ -122,20 +122,20 @@ void doit(int connfd)
   			printf("Error\n");
   		if (rio_writen(connfd, buf, n) < 0)
   			printf("Error\n");
-  		strcat(cache->response_hdr, buf);
+  		strcat(cache.response_hdr, buf);
   	}
   	while((n = rio_readnb(&rio_server, buf, MAXLINE)) > 0) {
-  		cache->cache_bytes = n;
+  		cache.cache_bytes += n;
     	if((size+=n) <= MAX_OBJECT_SIZE) {
     		memcpy(cache_buf + size, buf, n);
     	}
     	if (rio_writen(connfd, buf, n) < 0)
     		printf("Error\n");
   	}
-  	if (cache->cache_bytes <= MAX_OBJECT_SIZE) {
-  		cache->destination_buf = (cache_block*)malloc(cache->cache_bytes * sizeof(char));
-  		memcpy(cache->destination_buf, cache_buf, cache->cache_bytes);
-  		strcpy(cache->url, uri);
+  	if (cache.cache_bytes <= MAX_OBJECT_SIZE) {
+  		cache.destination_buf = (cache_block*)malloc(cache.cache_bytes * sizeof(char));
+  		memcpy(cache.destination_buf, cache_buf, cache.cache_bytes);
+  		strcpy(cache.url, uri);
   	}
   	//memcpy(cache->response_hdr, server_http_header, n);
   	Close(serverfd);
@@ -210,11 +210,6 @@ void parse_uri(char *uri, char *hostname, char *path, int *port)
     }
   }
   return;
-}
-
-void init_cache() {
-	strcpy(cache->url, "");
-	strcpy(cache->response_hdr, "");
 }
 /*
  *  * clienterror - returns an error message to the client
